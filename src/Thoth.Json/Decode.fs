@@ -585,10 +585,12 @@ module Decode =
     type IRequiredGetter =
         abstract Field : string -> Decoder<'a> -> 'a
         abstract At : List<string> -> Decoder<'a> -> 'a
+        abstract Custom : Decoder<'a> -> 'a
 
     type IOptionalGetter =
         abstract Field : string -> Decoder<'a> -> 'a option
         abstract At : List<string> -> Decoder<'a> -> 'a option
+        abstract Custom : Decoder<'a> -> 'a option
 
     type IGetters =
         abstract Required: IRequiredGetter
@@ -605,6 +607,10 @@ module Decode =
                             | Error msg -> failwith msg
                         member __.At (fieldNames : string list) (decoder : Decoder<_>) =
                             match fromValue path (at fieldNames decoder) v with
+                            | Ok v -> v
+                            | Error msg -> failwith msg
+                        member __.Custom (decoder: Decoder<_>) =
+                            match fromValue path decoder v with
                             | Ok v -> v
                             | Error msg -> failwith msg }
                 member __.Optional =
@@ -626,7 +632,14 @@ module Decode =
                                 | Error error ->
                                     failwith (errorToString error)
                             else
-                                failwith (errorToString (path, BadType ("an object", v))) }
+                                failwith (errorToString (path, BadType ("an object", v)))
+                        member __.Custom (decoder: Decoder<_>) =
+                            match decodeValueError path decoder v with
+                            | Ok v -> Some v
+                            | Error (_, BadField _ )
+                            | Error (_, BadPrimitive (_, null)) -> None
+                            | Error error ->
+                                failwith (errorToString error) }
             } |> Ok
 
     ///////////////////////
